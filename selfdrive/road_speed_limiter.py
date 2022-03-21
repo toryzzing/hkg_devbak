@@ -10,7 +10,7 @@ from threading import Thread
 from cereal import messaging
 from common.numpy_fast import clip
 from common.realtime import sec_since_boot
-from selfdrive.config import Conversions as CV
+from common.conversions import Conversions as CV
 
 CAMERA_SPEED_FACTOR = 1.05
 
@@ -173,14 +173,14 @@ class RoadLimitSpeedServer:
 
   def check(self):
     now = sec_since_boot()
-    if now - self.last_updated > 20.:
+    if now - self.last_updated > 6.:
       try:
         self.lock.acquire()
         self.json_road_limit = None
       finally:
         self.lock.release()
 
-    if now - self.last_updated_active > 10.:
+    if now - self.last_updated_active > 6.:
       self.active = 0
 
   def get_limit_val(self, key, default=None):
@@ -285,10 +285,10 @@ class RoadSpeedLimiter:
           MIN_LIMIT = 40
           MAX_LIMIT = 120
         else:
-          MIN_LIMIT = 30
+          MIN_LIMIT = 20
           MAX_LIMIT = 100
       else:
-        MIN_LIMIT = 30
+        MIN_LIMIT = 20
         MAX_LIMIT = 120
 
       if cam_type == 22:  # speed bump

@@ -157,6 +157,7 @@ struct CarState {
   # brake pedal, 0.0-1.0
   brake @5 :Float32;      # this is user pedal only
   brakePressed @6 :Bool;  # this is user pedal only
+  parkingBrake @39 :Bool;
   brakeHoldActive @38 :Bool;
 
   # steering wheel
@@ -167,8 +168,8 @@ struct CarState {
   steeringTorqueEps @27 :Float32;  # TODO: standardize units
   steeringPressed @9 :Bool;        # if the user is using the steering wheel
   steeringRateLimited @29 :Bool;   # if the torque is limited by the rate limiter
-  steerWarning @35 :Bool;          # temporary steer unavailble
-  steerError @36 :Bool;            # permanent steer error
+  steerFaultTemporary @35 :Bool;   # temporary EPS fault
+  steerFaultPermanent @36 :Bool;   # permanent EPS fault
   stockAeb @30 :Bool;
   stockFcw @31 :Bool;
   espDisabled @32 :Bool;
@@ -200,11 +201,11 @@ struct CarState {
   leftBlindspot @33 :Bool; # Is there something blocking the left lane change
   rightBlindspot @34 :Bool; # Is there something blocking the right lane change
 
-  cluSpeedMs @39 :Float32;
-  cruiseGap @40 : Int32;
-  autoHold @41 : Int32;
-  tpms @42 : Tpms;
-  vCluRatio @43 :Float32;
+  cluSpeedMs @40 :Float32;
+  cruiseGap @41 : Int32;
+  autoHold @42 : Int32;
+  tpms @43 : Tpms;
+  vCluRatio @44 :Float32;
 
   struct Tpms {
     fl @0 :Float32;
@@ -308,7 +309,8 @@ struct RadarData @0x888ad6581cf0aacb {
 struct CarControl {
   # must be true for any actuator commands to work
   enabled @0 :Bool;
-  active @7 :Bool;
+  latActive @11: Bool;
+  longActive @12: Bool;
 
   # Actuator commands as computed by controlsd
   actuators @6 :Actuators;
@@ -324,7 +326,7 @@ struct CarControl {
   cruiseControl @4 :CruiseControl;
   hudControl @5 :HUDControl;
 
-  sccSmoother @11 :SccSmoother;
+  sccSmoother @13 :SccSmoother;
 
   struct SccSmoother {
     longControl @0:Bool;
@@ -412,6 +414,7 @@ struct CarControl {
   gasDEPRECATED @1 :Float32;
   brakeDEPRECATED @2 :Float32;
   steeringTorqueDEPRECATED @3 :Float32;
+  activeDEPRECATED @7 :Bool;
 }
 
 # ****** car param ******
@@ -521,6 +524,7 @@ struct CarParams {
     kpV @1 :List(Float32);
     kiBP @2 :List(Float32);
     kiV @3 :List(Float32);
+    kf @6 :Float32;
     deadzoneBP @4 :List(Float32);
     deadzoneV @5 :List(Float32);
   }

@@ -74,6 +74,8 @@ typedef struct FrameMetadata {
   unsigned int lens_pos;
   float lens_err;
   float lens_true_pos;
+
+  float processing_time;
 } FrameMetadata;
 
 typedef struct CameraExpInfo {
@@ -134,3 +136,5 @@ void cameras_run(MultiCameraState *s);
 void cameras_close(MultiCameraState *s);
 void camera_autoexposure(CameraState *s, float grey_frac);
 void camerad_thread();
+
+int open_v4l_by_name_and_index(const char name[], int index = 0, int flags = O_RDWR | O_NONBLOCK);

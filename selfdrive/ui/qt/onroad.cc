@@ -22,7 +22,7 @@ OnroadWindow::OnroadWindow(QWidget *parent) : QWidget(parent) {
 
   QStackedLayout *road_view_layout = new QStackedLayout;
   road_view_layout->setStackingMode(QStackedLayout::StackAll);
-  nvg = new NvgWindow(VISION_STREAM_RGB_BACK, this);
+  nvg = new NvgWindow(VISION_STREAM_RGB_ROAD, this);
   road_view_layout->addWidget(nvg);
 
   QWidget * split_wrapper = new QWidget;
@@ -160,7 +160,7 @@ void OnroadWindow::offroadTransition(bool offroad) {
 
   // update stream type
   bool wide_cam = Hardware::TICI() && Params().getBool("EnableWideCamera");
-  nvg->setStreamType(wide_cam ? VISION_STREAM_RGB_WIDE : VISION_STREAM_RGB_BACK);
+  nvg->setStreamType(wide_cam ? VISION_STREAM_RGB_WIDE_ROAD : VISION_STREAM_RGB_ROAD);
 
   if(offroad && recorder) {
     recorder->stop(false);
@@ -294,8 +294,8 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIScene &scene) {
   }
   // paint path
   QLinearGradient bg(0, height(), 0, height() / 4);
-  bg.setColorAt(0, scene.end_to_end ? redColor(200) : QColor(255, 255, 255, 200));
-  bg.setColorAt(1, scene.end_to_end ? redColor(0) : QColor(255, 255, 255, 0));
+  bg.setColorAt(0, scene.end_to_end ? redColor(200) : whiteColor(200));
+  bg.setColorAt(1, scene.end_to_end ? redColor(0) : whiteColor(0));
   painter.setBrush(bg);
   painter.drawPolygon(scene.track_vertices.v, scene.track_vertices.cnt);
 }
@@ -455,15 +455,13 @@ void NvgWindow::drawHud(QPainter &p) {
   int scc_bus = car_params.getSccBus();
 
   QString infoText;
-  infoText.sprintf("AO(%.2f/%.2f) SR(%.2f) SRC(%.2f) SAD(%.2f) MDPS(%d) SCC(%d) LAD(%.2f/%.2f) SCC(%.2f/%.2f/%.2f)",
+  infoText.sprintf("AO(%.2f/%.2f) SR(%.2f) SRC(%.2f) SAD(%.2f) BUS(MDPS %d, SCC %d) SCC(%.2f/%.2f/%.2f)",
                       live_params.getAngleOffsetDeg(),
                       live_params.getAngleOffsetAverageDeg(),
                       controls_state.getSteerRatio(),
                       controls_state.getSteerRateCost(),
                       controls_state.getSteerActuatorDelay(),
                       mdps_bus, scc_bus,
-                      controls_state.getLongitudinalActuatorDelayLowerBound(),
-                      controls_state.getLongitudinalActuatorDelayUpperBound(),
                       controls_state.getSccGasFactor(),
                       controls_state.getSccBrakeFactor(),
                       controls_state.getSccCurvatureFactor()
