@@ -96,7 +96,7 @@ class Controls:
     get_one_can(self.can_sock)
 
     self.CI, self.CP = get_car(self.can_sock, self.pm.sock['sendcan'])
-    self.CP.unsafeMode = 0  # see panda/board/safety_declarations.h for allowed values
+    self.CP.alternativeExperience = 0  # see panda/board/safety_declarations.h for allowed values
 
     # read params
     self.is_metric = params.get_bool("IsMetric")
@@ -283,7 +283,7 @@ class Controls:
       if i < len(self.CP.safetyConfigs):
         safety_mismatch = pandaState.safetyModel != self.CP.safetyConfigs[i].safetyModel or \
                           pandaState.safetyParam != self.CP.safetyConfigs[i].safetyParam or \
-                          pandaState.unsafeMode != self.CP.unsafeMode
+                          pandaState.alternativeExperience != self.CP.alternativeExperience
       else:
         safety_mismatch = pandaState.safetyModel not in IGNORED_SAFETY_MODES
 
@@ -546,7 +546,7 @@ class Controls:
       # accel PID loop
       pid_accel_limits = self.CI.get_pid_accel_limits(self.CP, CS.vEgo, self.v_cruise_kph * CV.KPH_TO_MS)
       t_since_plan = (self.sm.frame - self.sm.rcv_frame['longitudinalPlan']) * DT_CTRL
-      actuators.accel = self.LoC.update(CC.longActive and CS.cruiseState.enabledAcc, CS, self.CP, long_plan, pid_accel_limits, t_since_plan, self.sm['radarState'])
+      actuators.accel = self.LoC.update(CC.longActive and CS.cruiseState.enabledAcc, CS, self.CP, long_plan, pid_accel_limits, t_since_plan)
 
       # Steering PID loop and lateral MPC
       desired_curvature, desired_curvature_rate = get_lag_adjusted_curvature(self.CP, CS.vEgo,
@@ -609,10 +609,14 @@ class Controls:
   def publish_logs(self, CS, start_time, CC, lac_log):
     """Send actuators and hud commands to the car, send controlsstate and MPC logging"""
 
-    orientation_value = self.sm['liveLocationKalman'].orientationNED.value
+    # Orientation and angle rates can be useful for carcontroller
+    # Only calibrated (car) frame is relevant for the carcontroller
+    orientation_value = list(self.sm['liveLocationKalman'].calibratedOrientationNED.value)
     if len(orientation_value) > 2:
-      CC.roll = orientation_value[0]
-      CC.pitch = orientation_value[1]
+      CC.orientationNED = orientation_value
+    angular_rate_value = list(self.sm['liveLocationKalman'].angularVelocityCalibrated.value)
+    if len(angular_rate_value) > 2:
+      CC.angularVelocity = angular_rate_value
 
     CC.cruiseControl.cancel = self.CP.pcmCruise and not self.enabled and CS.cruiseState.enabled
     if self.joystick_mode and self.sm.rcv_frame['testJoystick'] > 0 and self.sm['testJoystick'].buttons[0]:
