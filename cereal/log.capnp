@@ -585,23 +585,24 @@ struct ControlsState @0x97ff69c53601abf1 {
     lqrState @55 :LateralLQRState;
     angleState @58 :LateralAngleState;
     debugState @59 :LateralDebugState;
+    torqueState @60 :LateralTorqueState;
   }
 
-  angleSteers @60 :Float32;
-  applyAccel @61 :Float32;
-  aReqValue @62 :Float32;
-  aReqValueMin @63 :Float32;
-  aReqValueMax @64 :Float32;
+  angleSteers @61 :Float32;
+  applyAccel @62 :Float32;
+  aReqValue @63 :Float32;
+  aReqValueMin @64 :Float32;
+  aReqValueMax @65 :Float32;
 
-  steerRatio @65 :Float32;
-  steerRateCost @66 :Float32;
-  steerActuatorDelay @67 :Float32;
-  sccGasFactor @68 :Float32;
-  sccBrakeFactor @69 :Float32;
-  sccCurvatureFactor @70 :Float32;
+  steerRatio @66 :Float32;
+  steerRateCost @67 :Float32;
+  steerActuatorDelay @68 :Float32;
+  sccGasFactor @69 :Float32;
+  sccBrakeFactor @70 :Float32;
+  sccCurvatureFactor @71 :Float32;
 
-  sccStockCamAct @71 :Float32;
-  sccStockCamStatus @72 :Float32;
+  sccStockCamAct @72 :Float32;
+  sccStockCamStatus @73 :Float32;
 
 
   enum OpenpilotState @0xdbe58b96d2d1ac61 {
@@ -609,6 +610,7 @@ struct ControlsState @0x97ff69c53601abf1 {
     preEnabled @1;
     enabled @2;
     softDisabling @3;
+    overriding @4;
   }
 
   enum AlertStatus {
@@ -651,6 +653,18 @@ struct ControlsState @0x97ff69c53601abf1 {
     output @7 :Float32;
     saturated @8 :Bool;
     steeringAngleDesiredDeg @9 :Float32;
+   }
+  
+  struct LateralTorqueState {
+    active @0 :Bool;
+    error @1 :Float32;
+    errorRate @8 :Float32;
+    p @2 :Float32;
+    i @3 :Float32;
+    d @4 :Float32;
+    f @5 :Float32;
+    output @6 :Float32;
+    saturated @7 :Bool;
    }
 
   struct LateralLQRState {
@@ -897,6 +911,7 @@ struct LongitudinalPlan @0xe00b5b3eba12876c {
 }
 
 struct LateralPlan @0xe1e9318e2ae8b51e {
+  modelMonoTime @31 :UInt64;
   laneWidth @0 :Float32;
   lProb @5 :Float32;
   rProb @7 :Float32;
@@ -916,8 +931,8 @@ struct LateralPlan @0xe1e9318e2ae8b51e {
 
   solverExecutionTime @30 :Float32;
   
-  autoLaneChangeEnabled @31 :Bool;
-  autoLaneChangeTimer @32 :Int8;
+  autoLaneChangeEnabled @32 :Bool;
+  autoLaneChangeTimer @33 :Int8;
 
   enum Desire {
     none @0;
@@ -1255,6 +1270,10 @@ struct QcomGnss @0xde94674b07ae51c1 {
     gps @0;
     glonass @1;
     beidou @2;
+    unknown3 @3;
+    unknown4 @4;
+    unknown5 @5;
+    unknown6 @6;
   }
 
   enum SVObservationState @0xe81e829a0d6c83e9 {
@@ -1760,6 +1779,14 @@ struct RoadLimitSpeed {
     sectionLimitSpeed @6 :Int16;
     sectionLeftDist @7 :Int16;
     camSpeedFactor @8 :Float32;
+    restArea @9 :List(RestArea);
+
+    struct RestArea {
+      image @0 :Text;
+      title @1 :Text;
+      oilPrice @2 :Text;
+      distance @3 :Text;
+    }
 }
 
 struct Event {

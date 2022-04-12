@@ -99,6 +99,9 @@ def hw_state_thread(end_event, hw_queue):
   registered_count = 0
   prev_hw_state = None
 
+  modem_version = None
+  modem_nv = None
+
   while not end_event.is_set():
     # these are expensive calls. update every 10s
     if (count % int(10. / DT_TRML)) == 0:
@@ -107,6 +110,14 @@ def hw_state_thread(end_event, hw_queue):
         modem_temps = HARDWARE.get_modem_temperatures()
         if len(modem_temps) == 0 and prev_hw_state is not None:
           modem_temps = prev_hw_state.modem_temps
+
+        # Log modem version once
+        if TICI and ((modem_version is None) or (modem_nv is None)):
+          modem_version = HARDWARE.get_modem_version()  # pylint: disable=assignment-from-none
+          modem_nv = HARDWARE.get_modem_nv()  # pylint: disable=assignment-from-none
+
+          if (modem_version is not None) and (modem_nv is not None):
+            cloudlog.event("modem version", version=modem_version, nv=modem_nv)
 
         hw_state = HardwareState(
           network_type=network_type,
@@ -361,7 +372,11 @@ def thermald_thread(end_event, hw_queue):
     msg.deviceState.offroadPowerUsageUwh = power_monitor.get_power_used()
     msg.deviceState.carBatteryCapacityUwh = max(0, power_monitor.get_car_battery_capacity())
     current_power_draw = HARDWARE.get_current_power_draw()  # pylint: disable=assignment-from-none
-    msg.deviceState.powerDrawW = current_power_draw if current_power_draw is not None else 0
+    if current_power_draw is not None:
+      statlog.sample("power_draw", current_power_draw)
+      msg.deviceState.powerDrawW = current_power_draw
+    else:
+      msg.deviceState.powerDrawW = 0
 
     # Check if we need to disable charging (handled by boardd)
     msg.deviceState.chargingDisabled = power_monitor.should_disable_charging(onroad_conditions["ignition"], in_car, off_ts)
