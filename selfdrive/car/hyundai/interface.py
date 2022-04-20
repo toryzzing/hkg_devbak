@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from typing import List
 
 from cereal import car
 from common.numpy_fast import interp
@@ -45,34 +46,57 @@ class CarInterface(CarInterfaceBase):
     ret.steerFaultMaxFrames = 90
 
     # lateral
-    ret.lateralTuning.init('lqr')
+    lateral_control = Params().get("LateralControl", encoding='utf-8')
+    if lateral_control == 'TORQUE':
+      ret.lateralTuning.init('torque')
+      ret.lateralTuning.torque.useSteeringAngle = True
+      ret.lateralTuning.torque.kp = 1.2
+      ret.lateralTuning.torque.kf = 0.1
+      ret.lateralTuning.torque.friction = 0.0
+      ret.lateralTuning.torque.ki = 0.0
+      ret.lateralTuning.torque.kd = 0.0
+    elif lateral_control == 'INDI':
+      ret.lateralTuning.init('indi')
+      ret.lateralTuning.indi.innerLoopGainBP = [0.]
+      ret.lateralTuning.indi.innerLoopGainV = [3.3]
+      ret.lateralTuning.indi.outerLoopGainBP = [0.]
+      ret.lateralTuning.indi.outerLoopGainV = [2.8]
+      ret.lateralTuning.indi.timeConstantBP = [0.]
+      ret.lateralTuning.indi.timeConstantV = [1.4]
+      ret.lateralTuning.indi.actuatorEffectivenessBP = [0.]
+      ret.lateralTuning.indi.actuatorEffectivenessV = [1.8]
+    elif lateral_control == 'LQR':
+      ret.lateralTuning.init('lqr')
 
-    ret.lateralTuning.lqr.scale = 1600.
-    ret.lateralTuning.lqr.ki = 0.01
-    ret.lateralTuning.lqr.dcGain = 0.0027
+      ret.lateralTuning.lqr.scale = 1600.
+      ret.lateralTuning.lqr.ki = 0.01
+      ret.lateralTuning.lqr.dcGain = 0.0026
 
-    ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
-    ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
-    ret.lateralTuning.lqr.c = [1., 0.]
-    ret.lateralTuning.lqr.k = [-110., 451.]
-    ret.lateralTuning.lqr.l = [0.33, 0.318]
+      ret.lateralTuning.lqr.a = [0., 1., -0.22619643, 1.21822268]
+      ret.lateralTuning.lqr.b = [-1.92006585e-04, 3.95603032e-05]
+      ret.lateralTuning.lqr.c = [1., 0.]
+      ret.lateralTuning.lqr.k = [-110., 451.]
+      ret.lateralTuning.lqr.l = [0.33, 0.318]
+    else:
+      ret.lateralTuning.init('hybrid')
+
 
     ret.steerRatio = 16.5
-    ret.steerActuatorDelay = 0.2
+    ret.steerActuatorDelay = 0.1
     ret.steerRateCost = 0.35
 
     ret.steerLimitTimer = 2.5
 
     # longitudinal
-    ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 20.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
+    ret.longitudinalTuning.kpBP = [0., 5.*CV.KPH_TO_MS, 10.*CV.KPH_TO_MS, 30.*CV.KPH_TO_MS, 130.*CV.KPH_TO_MS]
     ret.longitudinalTuning.kpV = [1.25, 1.1, 1.0, 0.85, 0.48]
     ret.longitudinalTuning.kiBP = [0., 130. * CV.KPH_TO_MS]
-    ret.longitudinalTuning.kiV = [0.08, 0.03]
-    ret.longitudinalActuatorDelayLowerBound = 0.5
-    ret.longitudinalActuatorDelayUpperBound = 0.5
+    ret.longitudinalTuning.kiV = [0.1, 0.05]
+    ret.longitudinalActuatorDelayLowerBound = 0.3
+    ret.longitudinalActuatorDelayUpperBound = 0.3
 
     ret.stopAccel = -2.0
-    ret.stoppingDecelRate = 0.5  # brake_travel/s while trying to stop
+    ret.stoppingDecelRate = 0.6  # brake_travel/s while trying to stop
     ret.vEgoStopping = 0.5
     ret.vEgoStarting = 0.5
 
@@ -81,6 +105,8 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1900. + STD_CARGO_KG
       ret.wheelbase = 3.01
       ret.centerToFront = ret.wheelbase * 0.4
+      ret.maxSteeringAngleDeg = 90.
+      ret.steerFaultMaxAngle = 0
     elif candidate == CAR.GENESIS_G70:
       ret.mass = 1640. + STD_CARGO_KG
       ret.wheelbase = 2.84
@@ -256,10 +282,6 @@ class CarInterface(CarInterfaceBase):
 
       ret.steerRatio = 14.5
 
-      ret.lateralTuning.lqr.scale = 1650.
-      ret.lateralTuning.lqr.ki = 0.01
-      ret.lateralTuning.lqr.dcGain = 0.0027
-
 
 
     ret.radarTimeStep = 0.05
@@ -307,13 +329,17 @@ class CarInterface(CarInterfaceBase):
       ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.hyundaiCommunity, 0)]
     return ret
 
-  def update(self, c, can_strings):
+  def _update(self, c: car.CarControl) -> car.CarState:
+    pass
+
+  def update(self, c: car.CarControl, can_strings: List[bytes]) -> car.CarState:
     self.cp.update_strings(can_strings)
     self.cp2.update_strings(can_strings)
     self.cp_cam.update_strings(can_strings)
 
     ret = self.CS.update(self.cp, self.cp2, self.cp_cam)
     ret.canValid = self.cp.can_valid and self.cp2.can_valid and self.cp_cam.can_valid
+    ret.canTimeout = any(cp.bus_timeout for cp in self.can_parsers if cp is not None)
 
     if self.CP.pcmCruise and not self.CC.scc_live:
       self.CP.pcmCruise = False

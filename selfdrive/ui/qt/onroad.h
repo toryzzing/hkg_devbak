@@ -59,6 +59,8 @@ protected:
   const int radius = 192;
   const int img_size = (radius / 2) * 1.5;
 
+  uint64_t last_update_params;
+
   // neokii
   QPixmap ic_brake;
   QPixmap ic_autohold_warning;
@@ -76,6 +78,7 @@ protected:
   void drawSpeed(QPainter &p);
   void drawBottomIcons(QPainter &p);
   void drawSpeedLimit(QPainter &p);
+  void drawSteer(QPainter &p);
   void drawRestArea(QPainter &p);
   void drawTurnSignals(QPainter &p);
   void drawGpsStatus(QPainter &p);

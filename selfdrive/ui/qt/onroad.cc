@@ -237,8 +237,7 @@ void OnroadAlerts::paintEvent(QPaintEvent *event) {
 
 // NvgWindow
 
-NvgWindow::NvgWindow(VisionStreamType type, QWidget* parent) : fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraViewWidget("camerad", type, true, parent) {
-
+NvgWindow::NvgWindow(VisionStreamType type, QWidget* parent) : last_update_params(0), fps_filter(UI_FREQ, 3, 1. / UI_FREQ), CameraViewWidget("camerad", type, true, parent) {
 }
 
 void NvgWindow::initializeGL() {
@@ -288,7 +287,7 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
   const UIScene &scene = s->scene;
   // lanelines
   for (int i = 0; i < std::size(scene.lane_line_vertices); ++i) {
-    painter.setBrush(QColor::fromRgbF(1.0, 1.0, 1.0, scene.lane_line_probs[i]));
+    painter.setBrush(QColor::fromRgbF(1.0, 1.0, 1.0, std::clamp<float>(scene.lane_line_probs[i], 0.0, 0.7)));
     painter.drawPolygon(scene.lane_line_vertices[i].v, scene.lane_line_vertices[i].cnt);
   }
 
@@ -297,21 +296,24 @@ void NvgWindow::drawLaneLines(QPainter &painter, const UIState *s) {
     painter.setBrush(QColor::fromRgbF(1.0, 0, 0, std::clamp<float>(1.0 - scene.road_edge_stds[i], 0.0, 1.0)));
     painter.drawPolygon(scene.road_edge_vertices[i].v, scene.road_edge_vertices[i].cnt);
   }
+
   // paint path
-  QLinearGradient bg(0, height(), 0, height() / 2);
+  QLinearGradient bg(0, height(), 0, height() / 4);
   if (scene.end_to_end) {
     const auto &orientation = (*s->sm)["modelV2"].getModelV2().getOrientation();
     float orientation_future = 0;
     if (orientation.getZ().size() > 16) {
       orientation_future = std::abs(orientation.getZ()[16]);  // 2.5 seconds
     }
-    // straight: 101, in turns: 70
-    const float curve_hue = fmax(70, 101 - (orientation_future * 310));
+    // straight: 112, in turns: 70
+    float curve_hue = fmax(70, 112 - (orientation_future * 420));
+    // FIXME: painter.drawPolygon can be slow if hue is not rounded
+    curve_hue = int(curve_hue * 100 + 0.5) / 100;
 
-    bg.setColorAt(0.0, QColor::fromHslF(148 / 360., 1.0, 0.5, 1.0));
-    bg.setColorAt(0.35, QColor::fromHslF(148 / 360., 1.0, 0.5, 0.9));
-    bg.setColorAt(0.9, QColor::fromHslF(curve_hue / 360., 1.0, 0.65, 0.8));
-    bg.setColorAt(1.0, QColor::fromHslF(curve_hue / 360., 1.0, 0.65, 0.4));
+    bg.setColorAt(0.0 / 1.5, QColor::fromHslF(148 / 360., 1.0, 0.5, 1.0));
+    bg.setColorAt(0.55 / 1.5, QColor::fromHslF(112 / 360., 1.0, 0.68, 0.8));
+    bg.setColorAt(0.9 / 1.5, QColor::fromHslF(curve_hue / 360., 1.0, 0.65, 0.6));
+    bg.setColorAt(1.0, QColor::fromHslF(curve_hue / 360., 1.0, 0.65, 0.0));
   } else {
     bg.setColorAt(0, whiteColor());
     bg.setColorAt(1, whiteColor(0));
@@ -382,7 +384,12 @@ void NvgWindow::paintEvent(QPaintEvent *event) {
 void NvgWindow::showEvent(QShowEvent *event) {
   CameraViewWidget::showEvent(event);
 
-  ui_update_params(uiState());
+  auto now = millis_since_boot();
+  if(now - last_update_params > 1000*5) {
+    last_update_params = now;
+    ui_update_params(uiState());
+  }
+
   prev_draw_t = millis_since_boot();
 }
 
@@ -451,6 +458,7 @@ void NvgWindow::drawHud(QPainter &p) {
   drawMaxSpeed(p);
   drawSpeed(p);
   drawSpeedLimit(p);
+  drawSteer(p);
   drawRestArea(p);
   drawTurnSignals(p);
   drawGpsStatus(p);
@@ -476,7 +484,8 @@ void NvgWindow::drawHud(QPainter &p) {
   int scc_bus = car_params.getSccBus();
 
   QString infoText;
-  infoText.sprintf("AO(%.2f/%.2f) SR(%.2f) SRC(%.2f) SAD(%.2f) BUS(MDPS %d, SCC %d) SCC(%.2f/%.2f/%.2f)",
+  infoText.sprintf("%s AO(%.2f/%.2f) SR(%.2f) SRC(%.2f) SAD(%.2f) BUS(MDPS %d, SCC %d) SCC(%.2f/%.2f/%.2f)",
+                      s->lat_control.c_str(),
                       live_params.getAngleOffsetDeg(),
                       live_params.getAngleOffsetAverageDeg(),
                       controls_state.getSteerRatio(),
@@ -787,6 +796,37 @@ void NvgWindow::drawSpeedLimit(QPainter &p) {
       p.drawText(rect, Qt::AlignCenter, "CAM");
     }
   }
+}
+
+void NvgWindow::drawSteer(QPainter &p) {
+
+  int x = 30;
+  int y = 540;
+
+  const SubMaster &sm = *(uiState()->sm);
+  auto car_state = sm["carState"].getCarState();
+  auto car_control = sm["carControl"].getCarControl();
+
+  float steer_angle = car_state.getSteeringAngleDeg();
+  float desire_angle = car_control.getActuators().getSteeringAngleDeg();
+
+  configFont(p, "Open Sans", 50, "Bold");
+
+  QString str;
+  int width = 192;
+
+  str.sprintf("%.0f°", steer_angle);
+  QRect rect = QRect(x, y, width, width);
+
+  p.setPen(QColor(255, 255, 255, 200));
+  p.drawText(rect, Qt::AlignCenter, str);
+
+  str.sprintf("%.0f°", desire_angle);
+  rect.setRect(x, y + 80, width, width);
+
+  p.setPen(QColor(155, 255, 155, 200));
+  p.drawText(rect, Qt::AlignCenter, str);
+
 }
 
 QPixmap NvgWindow::get_icon_iol_com(const char* key) {

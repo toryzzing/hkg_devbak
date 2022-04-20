@@ -34,7 +34,7 @@ class LatControlLQR(LatControl):
     super().reset()
     self.i_lqr = 0.0
 
-  def update(self, active, CS, CP, VM, params, last_actuators, desired_curvature, desired_curvature_rate):
+  def update(self, active, CS, CP, VM, params, last_actuators, desired_curvature, desired_curvature_rate, llk):
     self.tune.check()
     lqr_log = log.ControlsState.LateralLQRState.new_message()
 
@@ -80,6 +80,7 @@ class LatControlLQR(LatControl):
           self.i_lqr = i
 
       output_steer = lqr_output + self.i_lqr
+      output_steer *= interp(abs((desired_angle + angle_steers_k) / 2.), [10., 45., 90.], [1, 1.2, 1.3])
       output_steer = clip(output_steer, -self.steer_max, self.steer_max)
 
     lqr_log.steeringAngleDeg = angle_steers_k
